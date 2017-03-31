@@ -1,0 +1,226 @@
+<html>
+<meta charset="UTF-8">
+<title>Chinese Words Split</title>
+<style>body{font-size:16px;font-family: consolas;}.r{color:red;}
+textarea {
+	width: 600px;
+	height: 120px;
+	padding: 5px;
+	font-size:16px;
+}
+.btn{
+margin: 10px 10px;
+padding: 5px 8px;
+font-size: 16px;
+line-height: 1.33;
+border-radius: 3px;
+color: #333;
+background-color: #fff;
+cursor: pointer;
+text-align: center;
+white-space: nowrap;
+border: 1px solid rgb(194, 194, 194);}
+.btn:hover{color:red;}
+.sec{color:red;}</style>
+<script src="ChineseSegmentorDictionary.txt" ></script>
+<script>
+ dictionaryTypes = ["adj", "QuBie", "Connector", "adverb",
+             "TanCi", "direction", "idiom", "phrase",
+             "number", "number2", "noun", "sound",
+             "preposition", "measureWord", "pronoun", "placeLocation",
+             "time", "assist", "verb", "punctuation",
+             "nonWord", "YuQi", "status", "name",
+             "placeProperNoun", "Orgnization", "foreignSymbol", "otherNoun",
+             "prefix", "suffix", "unkown", "unkown",
+             "surname", "questionWord", "title"];
+             https://zh.wikipedia.org/zh-hans/%E6%B1%89%E8%AF%AD%E8%AF%8D%E7%B1%BB
+codeSequence = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","0","1","2","3","4","5","6","7","8","9"]
+
+function GetWordCode(currentChar, expectedPosition, totalLength) {
+    var len = currentChar.length;
+    var wordReferenceNumber = currentChar.substr(0, len - 2);
+    var positionInWord = currentChar.substr(len - 2, 1);
+    var wordLength = currentChar.substr(len - 1, 1);
+    var expectedNextChar = wordReferenceNumber + (parseInt(positionInWord) + 1).toString() + wordLength;
+    
+    if(parseInt(wordLength) - parseInt(positionInWord) >= totalLength){
+        return [];
+    }
+    
+    if(expectedPosition > 0 && positionInWord != expectedPosition.toString()){
+        return [];
+    }
+        
+    if(positionInWord == wordLength){
+        return [wordReferenceNumber, '', ''];
+    }
+      
+    return [wordReferenceNumber, expectedNextChar, ''];
+}
+
+function parse() {
+    var start = new Date().getTime();
+    var input = document.getElementById('in').value;
+    input = input.replace(/[，\n\r ]+/g, ' ');
+    input = input.replace(/ $/g, '');
+    var info = '';
+    var inputGroups = input.split(' ');
+    //console.log(s,a)
+    for (var i = 0; i < inputGroups.length; i++) {
+        //console.log(inputGroups[i])
+        var possibleWords = [],
+            w = [];
+        currentPhrase = inputGroups[i].split('');
+        
+        var possibleCombinations = dictionary[currentPhrase[0]].split(',')
+        for (var k = 0; k < possibleCombinations.length; k++) {
+            var wordCode = GetWordCode(possibleCombinations[k], 1, currentPhrase.length)
+            if(wordCode.length > 0){
+                wordCode[2] = currentPhrase[0];
+                possibleWords.push(wordCode);
+            }
+        }
+       /*for(var ii=0;ii<possibleWords.length;ii++){
+            console.log(ii + ' - ',possibleWords[ii].join(','))
+        }*/
+        
+        for (var k = 1; k < currentPhrase.length; k++) {
+            var possibleWordsLength = possibleWords.length;
+            var possibleWordsExtended = [];
+            console.log(currentPhrase[k])
+            for (var i2 = 0; i2 < possibleWordsLength; i2++) {
+                var expectedNextChar = possibleWords[i2][possibleWords[i2].length - 2];
+                var possibleCombinations = dictionary[currentPhrase[k]].split(',')
+                if (expectedNextChar != '') {
+                    for (var k2 = 0; k2 < possibleCombinations.length; k2++) {
+                        if(possibleCombinations[k2] == expectedNextChar){
+                            var wordCode = GetWordCode(possibleCombinations[k2], -1, currentPhrase.length - k);
+                            possibleWords[i2][possibleWords[i2].length - 2] = wordCode[1];
+                            possibleWords[i2][possibleWords[i2].length - 1] += currentPhrase[k];
+                            possibleWordsExtended.push(possibleWords[i2]);
+                        }
+                    }
+                } else {
+                    for (var k2 = 0; k2 < possibleCombinations.length; k2++) {
+                        var wordCode = GetWordCode(possibleCombinations[k2], 1, currentPhrase.length - k)
+                        if(wordCode.length > 0){
+                            wordCode[2] = currentPhrase[k];
+                            possibleWordsExtended.push(possibleWords[i2].concat(wordCode));
+                        }
+                    }
+                }
+            }
+            possibleWords = deepCopy(possibleWordsExtended);
+            /*for(var ii=0;ii<possibleWords.length;ii++){
+                console.log(ii + ' - ',possibleWords[ii])
+            }*/
+        }
+        
+		console.log('all comb: ' + possibleWords.length)
+		
+        var str = check(possibleWords, currentPhrase);
+        if (str != '') {
+            info += '<span class="sec">' + inputGroups[i] + '</span>:<br>' + str + '<br>';
+        } else {
+            info += 'cannot understand <span class="sec">' + inputGroups[i] + '</span><br>';
+        }
+    }
+    var end = new Date().getTime();
+    var time = 'Execution time: ' + (end - start) + 'ms';
+    document.getElementById('out').innerHTML = info + time;
+}
+
+function check(possibleWords, currentPhrase) {
+    var tmp = [],
+        tmp_ = [];
+     var info = "";
+    
+    
+        for (var j = 0; j < possibleWords.length - 1; j++) { // remove item if two single chars are one word
+            for (var j2 = 0; j2 < possibleWords[j].length - 3; j2+=3) {
+                var combinedWord = possibleWords[j][j2+2]+possibleWords[j][j2+5];
+               // console.log(combinedWord)
+                for (var k = j; k < possibleWords.length; k++) {
+                    for (var k2 = j2; k2 < possibleWords[k].length; k2+=3) {
+                        if(possibleWords[k][k2+2] == combinedWord){
+                            possibleWords[j] = [];
+                            break;
+                            k = 100000000;
+                        }
+                    }   
+                }        
+            }
+        }
+        var typesOfPossibleWords = new Array(possibleWords);
+        possibleWordsLength =possibleWords.length;
+        while(possibleWordsLength--) typesOfPossibleWords[possibleWordsLength] = "";
+    for (var j = 0; j < possibleWords.length; j++) {
+        if(possibleWords[j].length == 0){
+            continue;
+        }
+        for (var j2 = 0; j2 < possibleWords[j].length; j2+=3) {
+            typesOfPossibleWords[j] += possibleWords[j][j2].substring(0,1);
+        }
+        var phraseIndex = typesOfPossibleWords[j].indexOf("sds"); // verb, adverb, verb 吃不吃
+        if(phraseIndex >= 0){
+            if(possibleWords[j][(phraseIndex + 1)*3 + 2] == "不"){
+                for(var j2 = phraseIndex+1; j2 <phraseIndex+ 3; j2++){
+                    possibleWords[j][phraseIndex*3 + 2] += possibleWords[j][j2*3+2];
+                }
+            }
+            typesOfPossibleWords[j] = typesOfPossibleWords[j].substring(0, phraseIndex) + "h" + typesOfPossibleWords[j].substring(phraseIndex + 3);
+            possibleWords[j].splice(phraseIndex*3 + 3, 6);
+        }
+        console.log(j + ' - ' + typesOfPossibleWords[j]);
+    }
+        
+    for (var i = 0; i < typesOfPossibleWords.length; i++) {
+        if(possibleWords[i].length == 0){
+            continue;
+        }
+        var types = typesOfPossibleWords[i].split('');
+        for(var j=0;j<types.length;j++){
+            var suffix = "";
+            
+            if(j > 0 && dictionaryTypes[codeSequence.indexOf(types[j - 1])] == "surname"){
+                suffix += ", given name";
+            }
+            
+            info += possibleWords[i][j*3+2] +  " = " + dictionaryTypes[codeSequence.indexOf(types[j])] + suffix + "<br>";
+            
+        }
+        info += "<br>";
+    }
+    
+    for (var j = 0; j < tmp.length; j++) {
+        console.log(tmp_[j])
+    }
+    return info
+}
+
+function deepCopy(o) {
+    var out, v, key;
+    out = Array.isArray(o) ? [] : {};
+    for (key in o) {
+        v = o[key];
+        out[key] = (typeof v === "object") ? deepCopy(v) : v;
+    }
+    return out;
+}
+Array.prototype.clean = function(deleteValue) {
+    for (var i = 0; i < this.length; i++) {
+        if (this[i] == deleteValue) {
+            this.splice(i, 1);
+            i--;
+        }
+    }
+    return this;
+};
+
+</script>
+
+<textarea id='in'>南京市长江大桥
+</textarea><br>
+<input type='button' class=btn onclick='parse()' value='Generate'/>
+<div id='out'></div>
+</html>
